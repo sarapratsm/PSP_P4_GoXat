@@ -141,7 +141,7 @@ func (s *Server) handleNickChange(conn net.Conn, newNick string) {
 
 
 func main() {
-	s := NewServer("tcp", ":8080")
+	s := NewServer("tcp", ":4356")
 	if s != nil {
 		s.Start()
 	}

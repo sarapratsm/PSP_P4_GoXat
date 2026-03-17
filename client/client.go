@@ -32,6 +32,7 @@ func (c *Client) Connect() {
 
 	// Després llancem qui escolta al servidor
 	go c.serverListener()
+	fmt.Println("--- T'has connectat al xat ---")
 	
 	// Finalment entrem en el bucle de lectura del teclat
 	c.Read()
@@ -75,6 +76,6 @@ func (c *Client) serverListener() {
 
 func main() {
 	// Per provar-ho, creem el client i connectem
-	c := NewClient("tcp", "localhost:8080")
+	c := NewClient("tcp", "localhost:4356")
 	c.Connect()
 }
