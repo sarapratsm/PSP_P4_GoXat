@@ -14,7 +14,7 @@ type Server struct {
 	protocol  string
 	address   string
 	listener  net.Listener
-	mu        sync.Mutex
+	mut        sync.Mutex
 }
 
 func NewServer(protocol, address string) *Server {
@@ -30,26 +30,32 @@ func NewServer(protocol, address string) *Server {
 		fmt.Println("Error:", err)
 		return nil
 	}
-	fmt.Println("Chat server started on", address)
+	fmt.Println("Server started on", address)
 	return s
 }
 
 
 func (s *Server) Start() {
 	defer s.close()
-	go s.handleBroadcast()
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			continue
 		}
 
-		// Al connectar, assignem el RemoteAddr com a Nick per defecte
-		s.mu.Lock()
-		s.clients[conn] = conn.RemoteAddr().String()
-		s.mu.Unlock()
+		// Assignem user_PORT com a usuari per defecte
+        remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
+        port := remoteAddr.Port
+        defaultNick := fmt.Sprintf("user_%d", port)
 
-		go s.handleClient(conn)
+        s.mut.Lock()
+        s.clients[conn] = defaultNick
+        s.mut.Unlock()
+
+        go s.handleClient(conn)
+        
+        // Avisem que algú ha entrat
+        s.broadcastMessage(fmt.Sprintf("--- %s s'ha connectat ---", defaultNick), conn)
 
 	}
 
@@ -65,11 +71,11 @@ func (s *Server) close() {
 func (s *Server) handleClient(conn net.Conn) {
 	//Definim una funció per a que s'executi quan s'acabi aquesta
 	defer func() {
-		s.mu.Lock()
+		s.mut.Lock()
 		nick := s.clients[conn]
 		delete(s.clients, conn)
-		s.mu.Unlock()
-		s.broadcast <- fmt.Sprintf("--- %s ha sortit del xat ---", nick)
+		s.mut.Unlock()
+		s.broadcastMessage(fmt.Sprintf("--- %s ha sortit del xat ---", nick), nil)		
 		conn.Close()
 	}()
 
@@ -79,56 +85,60 @@ func (s *Server) handleClient(conn net.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		msg := scanner.Text()
+		msgUpper := strings.ToUpper(msg)
 
 		// 1. Gestió de la comanda /QUIT
-		if strings.ToUpper(msg) == "/QUIT" {
+		if msgUpper == "/QUIT" {
 			return 
 		}
 
 		// 2. Gestió de la comanda /NICK <nou_nickname>
-		if strings.HasPrefix(msg, "/NICK ") {
-			newNick := strings.TrimSpace(strings.TrimPrefix(msg, "/NICK "))
+		if strings.HasPrefix(msgUpper, "/NICK ") {
+			newNick := strings.TrimSpace(msg[6:])			
 			s.handleNickChange(conn, newNick)
+
 			continue
 		}
 
 		// 3. Missatge normal (Broadcast)
-		s.mu.Lock()
+		s.mut.Lock()
 		currentNick := s.clients[conn]
-		s.mu.Unlock()
+		s.mut.Unlock()
 		
-		s.broadcast <- fmt.Sprintf("[%s]: %s", currentNick, msg)
+		s.broadcastMessage(fmt.Sprintf("[%s]: %s", currentNick, msg), conn)
+	}
+}
+
+//Envia el missatge a tothom menys al sender
+func (s *Server) broadcastMessage(msg string, sender net.Conn) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	for clientConn := range s.clients {
+		if clientConn != sender { 
+			fmt.Fprintln(clientConn, msg)
+		}
 	}
 }
 
 func (s *Server) handleNickChange(conn net.Conn, newNick string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mut.Lock()
 
 	// Comprovar si el nou nick ja existeix (ha de ser únic)
 	for _, existingNick := range s.clients {
 		if existingNick == newNick {
 			fmt.Fprintln(conn, "ERROR: Aquest Nick ja està en ús.")
+			s.mut.Unlock()
 			return
 		}
 	}
 
 	oldNick := s.clients[conn]
 	s.clients[conn] = newNick
+	s.mut.Unlock()
 	fmt.Fprintln(conn, "Nick canviat correctament a:", newNick)
-	s.broadcast <- fmt.Sprintf("--- %s ara es diu %s ---", oldNick, newNick)
-}
+	s.broadcastMessage(fmt.Sprintf("--- %s ara es diu %s ---", oldNick, newNick), conn)}
 
-func (s *Server) handleBroadcast() {
-	for {
-		msg := <-s.broadcast
-		s.mu.Lock()
-		for client := range s.clients {
-			fmt.Fprintln(client, msg) // Send message to each client
-		}
-		s.mu.Unlock()
-	}
-}
+
 
 func main() {
 	s := NewServer("tcp", ":8080")
