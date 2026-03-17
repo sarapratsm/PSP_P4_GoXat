@@ -27,14 +27,13 @@ func (c *Client) Connect() {
 		fmt.Println("Error connecting to server:", err)
 		return
 	}
-	// Primer guardem la connexió
+	// guardem la connexió dins el client
 	c.conn = conn
 
-	// Després llancem qui escolta al servidor
 	go c.serverListener()
 	fmt.Println("--- T'has connectat al xat ---")
 	
-	// Finalment entrem en el bucle de lectura del teclat
+	// entrem en bucle de lectura del teclat
 	c.Read()
 }
 
@@ -46,8 +45,6 @@ func (c *Client) Close() {
 
 func (c *Client) Read() {
 	inputScanner := bufio.NewScanner(os.Stdin)
-	// No posem el primer "> " aquí perquè el servidor ens enviarà 
-	// el missatge de benvinguda i ens el trepitjarà.
 	
 	for inputScanner.Scan() {
 		text := inputScanner.Text()
@@ -55,7 +52,7 @@ func (c *Client) Read() {
 		// Enviar el missatge al servidor
 		fmt.Fprintln(c.conn, text)
 
-		// Si l'usuari vol marxar
+		// Si l'usuari vol marxar...
 		if strings.ToUpper(text) == "/QUIT" {
 			fmt.Println("Desconnectant...")
 			return
