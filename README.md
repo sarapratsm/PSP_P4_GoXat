@@ -1,5 +1,8 @@
 # IRC-Go Chat Server 🚀
 
+![CFGS DAM](https://img.shields.io/badge/CFGS-DAM-green)
+![PSP](https://img.shields.io/badge/assignatura-PSP-teal)
+
 Aquesta és una implementació senzilla d'un servidor i client de xat basat en el protocol IRC, desenvolupat amb el llenguatge Go fent servir exclusivament la llibreria estàndard (`net` i `bufio`).
 
 ---
